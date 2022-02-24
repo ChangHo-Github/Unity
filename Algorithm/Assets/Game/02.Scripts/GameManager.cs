@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class GameManager : MonoBehaviour
+public class GameManager : MonoBehaviour, Emotion
 {
     // Start is called before the first frame update
     void Start()
@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
         archer.WSkill();
         archer.Evasion();
         archer.RSkill();
+
+        Happy();
     }
 
     public void CrusaderSetting()
@@ -31,5 +33,12 @@ public class GameManager : MonoBehaviour
         crusader.WSkill();
         crusader.Evasion();
         crusader.RSkill();
+
+        Happy();
+    }
+
+    public void Happy()
+    {
+        
     }
 }
