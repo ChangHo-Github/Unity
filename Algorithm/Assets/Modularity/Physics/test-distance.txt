@@ -1,0 +1,299 @@
+using System;
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class VertexManager : MonoBehaviour
+{
+    public static VertexManager instance = null;
+
+    public Text latitudeText;
+    public Text longitudeText;
+    public Text widthText;
+    public Text heightText;
+
+    private Gyroscope gyro;
+    private bool gpsStarted = false;
+    private LocationInfo location;
+    private WaitForSeconds second;
+    private float trueHeading; // 지리적 북극을 기준으로 각도를 나타낸다.
+
+    private float cameraVerticalAngle;
+    private float cameraVerticalAngleRadian;
+    private float cameraVerticalFov;
+    private float cameraVerticalFovRadian;
+    private float cameraVerticalFovHalfRadian;
+    //private float cameraHorizontalFov;
+    private float cameraHorizontalFovRadian;
+    private float cameraHorizontalFovHalfRadian;
+    public float cameraHorizontalFov;
+    private Vector2 screenCenter; // 화면 중앙 
+    private float distance;
+    private float shortestDistance;
+
+    private float lineWidth;
+    private float lineHeight;
+
+    public GameObject ltv; // Left top vertex
+    public GameObject rtv;
+    public GameObject rdv;
+    public GameObject ldv;
+
+    public RectTransform tl;
+    public RectTransform rl;
+    public RectTransform dl;
+    public RectTransform ll;
+
+    private Vector3 ltvPos;
+    private Vector3 rtvPos;
+    private Vector3 rdvPos;
+    private Vector3 ldvPos;
+
+    void Awake()
+    {
+        instance = this;
+
+        second = new WaitForSeconds(1.0f);
+        Input.compass.enabled = true;
+        // gyro 사용
+        gyro = Input.gyro;
+        gyro.enabled = true;
+
+        // 카메라 정보
+        cameraVerticalFov = Camera.main.fieldOfView;
+        cameraVerticalFovRadian = (float)(0.0174f) * cameraVerticalFov;
+        cameraVerticalFovHalfRadian = cameraVerticalFovRadian * 0.5f;
+        cameraHorizontalFovRadian = (float)Math.Atan(Math.Tan(cameraVerticalFovRadian * 0.5) * ((double)Screen.width / (double)Screen.height)) * 2;
+        cameraHorizontalFovHalfRadian = cameraHorizontalFovRadian * 0.5f;
+        cameraHorizontalFov = (float)(cameraHorizontalFovRadian * 57.32f);
+        screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+    }
+
+    void Start()
+    {
+        StartCoroutine(GPS());
+    }
+
+    void Update()
+    {
+        distance = BluetoothManager.distance;
+
+        cameraVerticalAngleRadian = (float)Math.Atan(-1 * gyro.gravity.z / gyro.gravity.y);
+        cameraVerticalAngle = (float)(57.32f) * cameraVerticalAngleRadian;
+        shortestDistance = distance * (float)Math.Cos(cameraVerticalAngleRadian);
+
+        LineSetting();
+        LineHeight();
+        LineWidth();
+
+        if (gyro.gravity.z > 0.1f || gyro.gravity.z < -0.1f)
+        {
+            if (gyro.gravity.z > 0)
+            {
+                trueHeading = Input.compass.trueHeading + 180;
+
+                if (trueHeading >= 360f)
+                {
+                    trueHeading = trueHeading - 360f;
+                }
+            }
+            else
+            {
+                trueHeading = Input.compass.trueHeading;
+            }
+        }
+    }
+
+    private void LineSetting()
+    {
+        ltvPos = ltv.transform.localPosition;
+        rtvPos = rtv.transform.localPosition;
+        rdvPos = rdv.transform.localPosition;
+        ldvPos = ldv.transform.localPosition;
+
+        tl = ReturnLine(tl, ltvPos, rtvPos);
+        rl = ReturnLine(rl, rtvPos, rdvPos);
+        dl = ReturnLine(dl, rdvPos, ldvPos);
+        ll = ReturnLine(ll, ldvPos, ltvPos);
+    }
+
+    public static RectTransform ReturnLine(RectTransform LineRT, Vector3 VertexOne, Vector3 VertexTwo)
+    {
+        LineRT.anchoredPosition = (VertexOne + VertexTwo) * 0.5f;
+        LineRT.sizeDelta = new Vector2(Vector2.Distance(VertexOne, VertexTwo), 5);
+
+        double radian = Math.Atan2((VertexTwo.y - VertexOne.y), (VertexTwo.x - VertexOne.x));
+        float lineAngle = (float)radian * 57.32f;
+
+        LineRT.localEulerAngles = new Vector3(0, 0, lineAngle);
+
+        return LineRT;
+    }
+
+    private void LineWidth()
+    {
+
+        float rw = (rtvPos.x + rdvPos.x) * 0.5f;
+        float arw = Math.Abs(rw);
+
+        float lw = (ltvPos.x + ldvPos.x) * 0.5f;
+        float alw = Math.Abs(lw);
+
+        float rwa = (float)Math.Atan((arw / screenCenter.x) * Math.Tan(cameraHorizontalFovHalfRadian));
+        float lwa = (float)Math.Atan((alw / screenCenter.x) * Math.Tan(cameraHorizontalFovHalfRadian));
+
+        if (rw <= 0)
+        {
+            lwa = -lwa;
+            rwa = -rwa;
+        }
+        else if (lw < 0)
+        {
+            lwa = -lwa;
+        }
+
+        lineWidth = (float)(Math.Tan(rwa) * distance - Math.Tan(lwa) * distance);
+
+        float widthCorrection = 1.0f;
+        if (cameraVerticalAngle > 40 && cameraVerticalAngle <= 90)
+        {
+            widthCorrection = 1 - (0.25f * (cameraVerticalAngle - 40) / 50);
+        }
+        lineWidth *= 0.84f * widthCorrection;
+
+        switch (SystemManager.user.language)
+        {
+            case "Kor":
+                widthText.text = "<b>가로</b> : " + lineWidth.ToString("F2") + "(M)";
+                break;
+            default:
+                widthText.text = "<b>Width</b> : " + lineWidth.ToString("F2") +"(M)";
+                break;
+        }
+    }
+
+    private void LineHeight() // 
+    {
+        float dh = (ldvPos.y + rdvPos.y) * 0.5f;
+        float adh = Math.Abs(dh);
+
+        float th = (ltvPos.y + rtvPos.y) * 0.5f;
+        float ath = Math.Abs(th);
+
+        float dha = (float)Math.Atan((adh / screenCenter.y) * Math.Tan(cameraVerticalFovHalfRadian));
+
+        float tha = (float)Math.Atan((ath / screenCenter.y) * Math.Tan(cameraVerticalFovHalfRadian));
+
+        if (0 >= th)
+        {
+            tha = -tha;
+            dha = -dha;
+        }
+        else if (0 > dh)
+        {
+            dha = -dha;
+        }
+
+        lineHeight = (float)((Math.Tan(cameraVerticalAngleRadian + tha) * shortestDistance) - (Math.Tan(cameraVerticalAngleRadian + dha) * shortestDistance));
+
+        lineHeight *= 0.81f;
+
+        float heightCorrection = 1.0f;
+        if (cameraVerticalAngle > 45 && cameraVerticalAngle <= 90)
+        {
+            heightCorrection = 1 - (0.13f * (cameraVerticalAngle - 45) / 45);
+        }
+        lineHeight *= heightCorrection;
+
+        switch (SystemManager.user.language)
+        {
+            case "Kor":
+                heightText.text = "<b>세로</b> : " + lineHeight.ToString("F2") + "(M)";
+                break;
+            default:
+                heightText.text = "<b>Height</b> : " + lineHeight.ToString("F2") + "(M)";
+                break;
+        }
+    }
+
+    private IEnumerator GPS()
+    {
+        if (!Input.location.isEnabledByUser)
+        {
+            yield break;
+        }
+
+        Input.location.Start(5f, 5f);
+
+        int maxWait = 20;
+        while (Input.location.status == LocationServiceStatus.Initializing && maxWait > 0)
+        {
+            yield return second;
+            maxWait -= 1;
+        }
+
+        if (maxWait < 1)
+        {
+            yield break;
+        }
+
+        if (Input.location.status == LocationServiceStatus.Failed)
+        {
+            yield break;
+
+        }
+        else
+        {
+            location = Input.location.lastData;
+            latitudeText.text = location.latitude.ToString();
+            longitudeText.text = location.longitude.ToString();
+            gpsStarted = true;
+
+            while (gpsStarted)
+            {
+                GpsReSetting();
+
+                yield return second;
+            }
+        }
+    }
+
+    private void GpsReSetting()
+    {
+        location = Input.location.lastData;
+        float latitude = location.latitude;
+        float longitude = location.longitude;
+        float radintrueHeading = trueHeading * 0.017f; // 라디안을 곱한 수치
+
+
+        if (trueHeading >= 0 && trueHeading < 90f)
+        {
+            latitudeText.text = "N : " + (latitude + Math.Abs(Math.Cos(radintrueHeading) * BluetoothManager.distance) * 0.000009f).ToString("F5");
+            longitudeText.text = "E : " + (longitude + Math.Abs(Math.Sin(radintrueHeading) * BluetoothManager.distance) * 0.0000115f).ToString("F5");
+        }
+        else if (trueHeading >= 90 && trueHeading < 180f)
+        {
+            latitudeText.text = "N : " + (latitude - Math.Abs(Math.Cos(3.14f - radintrueHeading) * BluetoothManager.distance) * 0.000009f).ToString("F5");
+            longitudeText.text = "E : " + (longitude + Math.Abs(Math.Sin(3.14f - radintrueHeading) * BluetoothManager.distance) * 0.0000115f).ToString("F5");
+        }
+        else if (trueHeading >= 180 && trueHeading < 270)
+        {
+            latitudeText.text = "N : " + (latitude - Math.Abs(Math.Cos(radintrueHeading - 3.14f) * BluetoothManager.distance) * 0.000009f).ToString("F5");
+            longitudeText.text = "E : " + (longitude - Math.Abs(Math.Sin(radintrueHeading - 3.14f) * BluetoothManager.distance) * 0.0000115f).ToString("F5");
+        }
+        else
+        {
+            latitudeText.text = "N : " + (latitude + Math.Abs(Math.Cos(6.28f - radintrueHeading) * BluetoothManager.distance) * 0.000009f).ToString("F5");
+            longitudeText.text = "E : " + (longitude - Math.Abs(Math.Sin(6.28f - radintrueHeading) * BluetoothManager.distance) * 0.0000115f).ToString("F5");
+        }
+    }
+
+    public void StopGPS()
+    {
+        if (Input.location.isEnabledByUser)
+        {
+            gpsStarted = false;
+            Input.location.Stop();
+        }
+    }
+}
