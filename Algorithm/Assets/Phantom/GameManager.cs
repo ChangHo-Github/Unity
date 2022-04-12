@@ -4,18 +4,14 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
-    void Awake()
-    {
-        
-    }
-
     void Start()
     {
-        
+        string str = "ÀÌ¸§ÀÌ ¹¹¿¡¿ä?\n³Ê¹¹³Ä?";
+        Debug.Log(str);
     }
 
     void Update()
     {
-        Debug.Log(Vector3.down);
+        
     }
 }

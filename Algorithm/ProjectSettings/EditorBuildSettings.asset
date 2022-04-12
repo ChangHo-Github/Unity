@@ -4,7 +4,10 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Phantom/UniTask/01.Scenes/UniTask.unity
+    guid: 191f1ccdef349ce458e0b53ebd6398e7
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 0365eb927a0ac3446bae15dc3a8b8f57, type: 2}
     UnityEditor.XR.ARKit.ARKitSettings: {fileID: 11400000, guid: 16d31e38acfe35c43a3b34b4ff0a3c93, type: 2}
